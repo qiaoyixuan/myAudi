@@ -288,7 +288,7 @@ class Base {
           -1732584194,
           271733878
         ];
-      return Array.from({length: Math.floor(x.length / 16) + 1}, (v, i) => i * 16)
+      return Array.from({ length: Math.floor(x.length / 16) + 1 }, (v, i) => i * 16)
         .reduce((chunks, i) => commands
           .reduce((newChunks, apply) => apply(newChunks, x, i), chunks.slice())
           .map((chunk, index) => safeAdd(chunk, chunks[index])), initialChunks);
@@ -332,7 +332,7 @@ const Running = async (Widget, default_args = '') => {
     Script.setWidget(W);
     Script.complete();
   } else {
-    let {act, data, __arg, __size} = args.queryParameters;
+    let { act, data, __arg, __size } = args.queryParameters;
     M = new Widget(__arg || default_args || '');
     if (__size) M.init(__size);
     if (!act || !M['_actions']) {
@@ -397,48 +397,12 @@ const GLOBAL_USER_DATA = {
   carLocation: '',
   longitude: '',
   latitude: '',
-  status: true, // false = 没锁车 true = 已锁车
-  doorAndWindow: '', // 门窗状态
+  isLocked: true, // false = 没锁车 true = 已锁车
+  doorStatus: [],
+  windowStatus: [],
+  // doorAndWindow: '', // 门窗状态
 };
 const AUDI_AMAP_KEY = 'c078fb16379c25bc0aad8633d82cf1dd';
-
-const DeviceSize = {
-  '428x926': {
-    small: {width: 176, height: 176},
-    medium: {width: 374, height: 176},
-    large: {width: 374, height: 391}
-  },
-  '390x844': {
-    small: {width: 161, height: 161},
-    medium: {width: 342, height: 161},
-    large: {width: 342, height: 359}
-  },
-  '414x896': {
-    small: {width: 169, height: 169},
-    medium: {width: 360, height: 169},
-    large: {width: 360, height: 376}
-  },
-  '375x812': {
-    small: {width: 155, height: 155},
-    medium: {width: 329, height: 155},
-    large: {width: 329, height: 345}
-  },
-  '414x736': {
-    small: {width: 159, height: 159},
-    medium: {width: 348, height: 159},
-    large: {width: 348, height: 357}
-  },
-  '375x667': {
-    small: {width: 148, height: 148},
-    medium: {width: 322, height: 148},
-    large: {width: 322, height: 324}
-  },
-  '320x568': {
-    small: {width: 141, height: 141},
-    medium: {width: 291, height: 141},
-    large: {width: 291, height: 299}
-  }
-};
 
 const FONT_NORMAL = 'Audi Type Normal';
 const FONT_BOLD = 'Audi Type Bold';
@@ -490,7 +454,6 @@ class Widget extends Base {
   async render() {
     const data = await this.getData();
     let screenSize = Device.screenSize();
-    data.size = DeviceSize[`${screenSize.width}x${screenSize.height}`] || DeviceSize['375x812'];
 
     if (data) {
       if (typeof data === 'object') {
@@ -530,11 +493,7 @@ class Widget extends Base {
     w.backgroundGradient = this.getBackgroundColor();
     const fontColor = new Color('#2B2B2B', 1);
 
-    const width = data.size['small']['width'];
     const paddingLeft = 0; //Math.round(width * 0.07);
-
-    // w.setPadding(0, 0, 0, 0);
-
     const topBox = w.addStack();
     const topBoxLeft = topBox.addStack();
 
@@ -573,7 +532,15 @@ class Widget extends Base {
     carStatusBox.cornerRadius = 4;
     carStatusBox.backgroundColor = new Color("#f2f2f2", 1);
 
-    const carStatusTxt = carStatusBox.addText(data.status ? '已锁车' : '已解锁');//carStatusBox.addText(`${data.status.doorsGeneralState}`);
+    let statusText = '已锁车'
+    if (data.doorStatus.length !== 0) {
+      statusText = data.doorStatus.join('、') + '';
+    } else if (data.windowStatus.length !== 0) {
+      statusText = data.windowStatus.join('、') + '';
+    } else if (!data.isLocked) {
+      statusText = '未锁车';
+    }
+    let carStatusTxt = carStatusBox.addText(statusText);
 
     carStatusTxt.font = new Font(FONT_NORMAL, 10);
     carStatusTxt.textColor = fontColor;
@@ -689,10 +656,10 @@ class Widget extends Base {
     // formatter.dateFormat = "HH:mm"
     // const updateDate = new Date(data.updateDate)
     // const updateDateString = formatter.string(updateDate)
-    // const _updateTime = updateStack.addText(updateDateString + ' ' + (data.status ? '已锁车' : '未锁车'))
+    // const _updateTime = updateStack.addText(updateDateString + ' ' + (data.isLocked ? '已锁车' : '未锁车'))
     // _updateTime.textOpacity = 0.75
     // _updateTime.font = Font.systemFont(12)
-    // _updateTime.textColor = data.status ? this.dynamicFontColor() : new Color('#FF9900', 1)
+    // _updateTime.textColor = data.isLocked ? this.dynamicFontColor() : new Color('#FF9900', 1)
 
     // // 根据选项是否开启位置显示
     // if (this.showLocation()) {
@@ -861,10 +828,10 @@ class Widget extends Base {
       // 总里程
       if (mileageVal) GLOBAL_USER_DATA.mileage = mileageVal;
       if (updateDate) GLOBAL_USER_DATA.updateDate = updateDate;
-      // 车辆状态 true = 已锁车
-      GLOBAL_USER_DATA.status = isLocked;
-      // true 车窗已关闭 | false 请检查车窗是否关闭
-      if (equipmentStatusArr) GLOBAL_USER_DATA.doorAndWindow = equipmentStatusArr.length === 0;
+      GLOBAL_USER_DATA.isLocked = isLocked;// 车辆状态 true = 已锁车
+      GLOBAL_USER_DATA.doorStatus = doorStatusArr;
+      GLOBAL_USER_DATA.windowStatus = windowStatusArr;
+      // GLOBAL_USER_DATA.doorAndWindow = equipmentStatusArr.length === 0;// true 车窗已关闭 | false 请检查车窗是否关闭
     } catch (error) {
       return '获取车辆状态失败，请确保是否已经激活车联网服务，' + error;
     }
@@ -1329,7 +1296,12 @@ class Widget extends Base {
     if (response.status === '1') {
       // const address = response.regeocode.formatted_address
       const addressComponent = response.regeocode.addressComponent;
-      const address = addressComponent.city + addressComponent.district + addressComponent.township;
+      console.log(addressComponent);
+      const address = (addressComponent.city + '' || addressComponent.province) +
+        addressComponent.district +
+        (addressComponent.streetNumber.street || '') +
+        (addressComponent.streetNumber.number || '');
+        // addressComponent.township;
       Keychain.set('carAddress', address);
       return address;
     } else {
@@ -1404,10 +1376,12 @@ class Widget extends Base {
     }, {
       name: 'handleVehiclesPosition',
       text: '车辆经纬度数据'
-    }, {
-      name: 'getDeviceInfo',
-      text: '获取设备信息'
-    }];
+    }
+    // , {
+    //   name: 'getDeviceInfo',
+    //   text: '获取设备信息'
+    // }
+  ];
 
     menuList.forEach(item => {
       alert.addAction(item.text);
@@ -1422,6 +1396,7 @@ class Widget extends Base {
 
   async currentLocation() {
     try {
+      const getVehiclesAddress = await this.handleGetCarAddress()
       const getVehiclesPosition = JSON.parse(await this.handleVehiclesPosition());
       const longitude = getVehiclesPosition.longitude / 1000000; // 车辆经度
       const latitude = getVehiclesPosition.latitude / 1000000; // 车辆纬度
@@ -1433,25 +1408,26 @@ class Widget extends Base {
       cb.addParameter('coord_type', `gcj02`);
       cb.addParameter('src', `ios.baidu.openAPIdemo`);
       cb.open();
+      this.notify('' + getVehiclesAddress);
     } catch (error) {
       await this.notify('执行失败', '当前车辆处于运行状态或车辆没有上传位置信息');
     }
   }
 
-  /**
-   * 获取设备信息
-   * @return {Promise<void>}
-   */
-  async getDeviceInfo() {
-    const data = {
-      systemVersion: Device.model() + ' ' + Device.systemName() + ' ' + Device.systemVersion(), // 系统版本号
-      screenSize: Device.screenSize(), // 屏幕尺寸
-      screenResolution: Device.screenResolution(), // 屏幕分辨率
-      screenScale: Device.screenScale(), // 屏幕比例
-      version: AUDI_VERSION // 版本号
-    };
-    console.log(JSON.stringify(data));
-  }
+  // /**
+  //  * 获取设备信息
+  //  * @return {Promise<void>}
+  //  */
+  // async getDeviceInfo() {
+  //   const data = {
+  //     systemVersion: Device.model() + ' ' + Device.systemName() + ' ' + Device.systemVersion(), // 系统版本号
+  //     screenSize: Device.screenSize(), // 屏幕尺寸
+  //     screenResolution: Device.screenResolution(), // 屏幕分辨率
+  //     screenScale: Device.screenScale(), // 屏幕比例
+  //     version: AUDI_VERSION // 版本号
+  //   };
+  //   console.log(JSON.stringify(data));
+  // }
 
   /**
    * 自定义注册点击事件，用 actionUrl 生成一个触发链接，点击后会执行下方对应的 action
