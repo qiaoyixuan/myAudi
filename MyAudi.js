@@ -69,7 +69,10 @@ class Base {
     response.method = method;
     response.headers = headers;
     if (method === 'POST' || method === 'post') response.body = body;
-    return (json ? response.loadJSON() : response.loadString());
+    const resp = (json ? response.loadJSON() : response.loadString());
+    console.log(url);
+    console.log(resp);
+    return resp;
   }
 
   /**
@@ -364,8 +367,6 @@ const Running = async (Widget, default_args = '') => {
 };
 
 
-const AUDI_VERSION = 2.0;
-
 const AUDI_SERVER_API = {
   login: 'https://audi2c.faw-vw.com/capi/v1/user/login',
   token: 'https://mbboauth-1d.prd.cn.vwg-connect.cn/mbbcoauth/mobile/oauth2/v1/token',
@@ -373,9 +374,7 @@ const AUDI_SERVER_API = {
   mal1aVehiclesStatus: vin => `https://mal-1a.prd.cn.vwg-connect.cn/api/bs/vsr/v1/vehicles/${vin}/status`,
   mal1aVehiclesPosition: vin => `https://mal-1a.prd.cn.vwg-connect.cn/api/bs/cf/v1/vehicles/${vin}/position`,
 };
-const SIGN_SERVER_API = {
-  sign: 'https://api.zhous.cloud/audiServer/signature/getSignature'
-};
+
 const REQUEST_HEADER = {
   Accept: 'application/json',
   'Content-Type': 'application/json',
@@ -400,7 +399,6 @@ const GLOBAL_USER_DATA = {
   isLocked: true, // false = 没锁车 true = 已锁车
   doorStatus: [],
   windowStatus: [],
-  // doorAndWindow: '', // 门窗状态
 };
 const AUDI_AMAP_KEY = 'c078fb16379c25bc0aad8633d82cf1dd';
 
@@ -418,10 +416,13 @@ class Widget extends Base {
   constructor(arg) {
     super(arg);
     if (config.runsInApp) {
-      if (!Keychain.contains('authToken')) this.registerAction('账户登录', this.actionAccountSettings);
-      if (Keychain.contains('authToken')) this.registerAction('刷新数据', this.actionLogAction);
-      if (Keychain.contains('authToken')) this.registerAction('当前位置', this.currentLocation);
-      this.registerAction('退出登录', this.actionLogOut);
+      if (!Keychain.contains('authToken')) {
+        this.registerAction('账户登录', this.actionAccountSettings);
+      } else {
+        this.registerAction('刷新数据', this.actionLogAction);
+        this.registerAction('当前位置', this.currentLocation);
+        this.registerAction('退出登录', this.actionLogOut);
+      }
     }
   }
 
@@ -453,25 +454,17 @@ class Widget extends Base {
    */
   async render() {
     const data = await this.getData();
-    let screenSize = Device.screenSize();
-
-    if (data) {
-      if (typeof data === 'object') {
-        switch (this.widgetFamily) {
-          case 'large':
-            return await this.renderMedium(data);
-          case 'medium':
-            return await this.renderMedium(data);
-          default:
-            return await this.renderSmall(data);
-        }
-      } else {
-        // 返回组件错误信息
-        return await this.renderError(data);
+    if (data && typeof data === 'object') {
+      switch (this.widgetFamily) {
+        case 'large':
+          return await this.renderMedium(data);
+        case 'medium':
+          return await this.renderMedium(data);
+        default:
+          return await this.renderSmall(data);
       }
-    } else {
-      return await this.renderEmpty();
     }
+    return await this.renderError(data + '');
   }
 
   formatStatusLabel(data) {
@@ -492,13 +485,10 @@ class Widget extends Base {
     let w = new ListWidget();
     w.backgroundGradient = this.getBackgroundColor();
     const fontColor = new Color('#2B2B2B', 1);
-
     const paddingLeft = 0; //Math.round(width * 0.07);
     const topBox = w.addStack();
     const topBoxLeft = topBox.addStack();
-
     // ---顶部左边部件---// 
-
     const carInfoContainer = topBoxLeft.addStack();
     carInfoContainer.setPadding(0, paddingLeft, 0, 0);
     const kmText = carInfoContainer.addText(data.endurance);
@@ -511,27 +501,22 @@ class Widget extends Base {
     levelText.textColor = fontColor;
     levelText.textOpacity = 0.6;
     carInfoContainer.centerAlignContent();
-
     const vehicleNameContainer = w.addStack();
     vehicleNameContainer.setPadding(0, paddingLeft, 0, 0);
     let vehicleNameStr = `Audi ${data.seriesName}`;
     const vehicleNameText = vehicleNameContainer.addText(vehicleNameStr);
-
     vehicleNameText.leftAlignText();
     vehicleNameText.font = new Font(FONT_EXTENDED_NOMAL, 16);
     vehicleNameText.textColor = fontColor;
-
     // ---中间部件---
     const carStatusContainer = w.addStack();
     carStatusContainer.setPadding(2, paddingLeft, 0, 0);
-
     const carStatusBox = carStatusContainer.addStack();
     carStatusBox.setPadding(2, 3, 2, 3);
     carStatusBox.layoutHorizontally();
     carStatusBox.centerAlignContent();
     carStatusBox.cornerRadius = 4;
     carStatusBox.backgroundColor = new Color("#f2f2f2", 1);
-
     let statusText = '已锁车'
     if (data.doorStatus.length !== 0) {
       statusText = data.doorStatus.join('、') + '';
@@ -541,22 +526,17 @@ class Widget extends Base {
       statusText = '未锁车';
     }
     let carStatusTxt = carStatusBox.addText(statusText);
-
     carStatusTxt.font = new Font(FONT_NORMAL, 10);
     carStatusTxt.textColor = fontColor;
     carStatusTxt.textOpacity = 0.7;
     carStatusBox.addSpacer(5);
-
     let statusLabel = this.formatStatusLabel(data);
     const updateTxt = carStatusBox.addText(statusLabel);
     updateTxt.font = new Font(FONT_NORMAL, 10);
     updateTxt.textColor = new Color("#333333", 1);
     updateTxt.textOpacity = 0.5;
-
     // ---中间部件完---
-
     w.addSpacer();
-
     // ---底部部件---
     const carImageContainer = w.addStack();
     carImageContainer.setPadding(5, 0, 0, 0);
@@ -566,7 +546,6 @@ class Widget extends Base {
     const _s = 1917 / 742;
     imageBox.imageSize = new Size(_s * 50, 50); // 1917 × 742
     // ---底部部件完---
-
     return w;
   }
 
@@ -577,151 +556,6 @@ class Widget extends Base {
    */
   async renderMedium(data) {
     const widget = new ListWidget();
-    // widget.backgroundGradient = this.getBackgroundColor()
-
-    // // 宽度
-    // const widgetWidth = Device.screenResolution().width / Device.screenScale()
-    // const screenSize = Device.screenSize().width
-    // // 解决 1080 分辨率显示的问题
-    // const widthInterval = widgetWidth - screenSize <= 0 ? 40 : widgetWidth - screenSize + 10
-    // const width = widgetWidth / 2 - widthInterval
-
-    // // 添加 Audi Stack
-    // const logoStack = widget.addStack()
-    // logoStack.size = new Size(widgetWidth, logoStack.size.height)
-
-    // // 显示车牌信息
-    // if (this.showPlate()) {
-    //   logoStack.addSpacer(width * 2 - 110) // 使图片顶到右边显示
-    //   // 车牌显示
-    //   const plateText = logoStack.addText(data.plateNo)
-    //   plateText.textColor = this.dynamicFontColor()
-    //   plateText.font = Font.systemFont(12)
-    // } else {
-    //   logoStack.addSpacer(width * 2 - 50) // 使图片顶到右边显示
-    // }
-
-    // // 添加 Audi Logo
-    // const _audiLogo = logoStack.addImage(await this.getImageByUrl(DEFAULT_AUDI_LOGO))
-    // _audiLogo.imageSize = new Size(50, 15)
-    // _audiLogo.tintColor = this.dynamicFontColor()
-
-    // const stack = widget.addStack()
-    // stack.size = new Size(widgetWidth, stack.size.height)
-
-    // // region leftStack start
-    // const leftStack = stack.addStack()
-    // leftStack.size = new Size(width, leftStack.size.height)
-    // leftStack.layoutVertically()
-    // // 车辆名称
-    // const _title = leftStack.addText(data.seriesName)
-    // _title.textOpacity = 1
-    // _title.textColor = this.dynamicFontColor()
-    // _title.font = Font.systemFont(18)
-
-    // leftStack.addSpacer(2)
-    // // 车辆功率
-    // const _desc = leftStack.addText(data.modelShortName)
-    // _desc.textOpacity = 0.75
-    // _desc.textColor = this.dynamicFontColor()
-    // _desc.font = Font.systemFont(12)
-    // // leftStack.addSpacer(10)
-    // const content = leftStack.addStack()
-    // content.bottomAlignContent()
-    // const _fuelStroke = content.addText(data.endurance + 'km')
-    // _fuelStroke.font = Font.heavySystemFont(20)
-    // _fuelStroke.textColor = this.dynamicFontColor()
-    // content.addSpacer(2)
-    // const _cut = content.addText('/')
-    // _cut.font = Font.systemFont(16)
-    // _cut.textOpacity = 0.75
-    // _cut.textColor = this.dynamicFontColor()
-    // content.addSpacer(2)
-    // const _fuelLevel = content.addText(data.fuelLevel + '%')
-    // _fuelLevel.font = Font.systemFont(16)
-    // _fuelLevel.textOpacity = 0.75
-    // _fuelLevel.textColor = this.dynamicFontColor()
-    // // 总行程
-    // const _trips = leftStack.addText('总里程: ' + data.mileage + ' km')
-    // _trips.textOpacity = 0.75
-    // _trips.font = Font.systemFont(14)
-    // _trips.textColor = this.dynamicFontColor()
-    // // 更新时间
-    // const updateStack = leftStack.addStack()
-    // updateStack.backgroundColor = new Color('#ffffff', 0.25)
-    // updateStack.setPadding(2, 3, 2, 3)
-    // updateStack.cornerRadius = 5
-    // // 格式化时间
-    // const formatter = new DateFormatter()
-    // formatter.dateFormat = "HH:mm"
-    // const updateDate = new Date(data.updateDate)
-    // const updateDateString = formatter.string(updateDate)
-    // const _updateTime = updateStack.addText(updateDateString + ' ' + (data.isLocked ? '已锁车' : '未锁车'))
-    // _updateTime.textOpacity = 0.75
-    // _updateTime.font = Font.systemFont(12)
-    // _updateTime.textColor = data.isLocked ? this.dynamicFontColor() : new Color('#FF9900', 1)
-
-    // // 根据选项是否开启位置显示
-    // if (this.showLocation()) {
-    //   const carLocation = data.carLocation
-    //   this.splitStr2Arr(carLocation, 14).forEach(item => {
-    //     const _location = leftStack.addText(item)
-    //     _location.textOpacity = 0.75
-    //     _location.textColor = this.dynamicFontColor()
-    //     _location.font = Font.systemFont(12)
-    //   })
-    // }
-    // // endregion leftStack end
-
-    // // region rightStack start
-    // const rightStack = stack.addStack()
-    // rightStack.size = new Size(width, rightStack.size.height)
-    // rightStack.layoutVertically()
-
-    // const audiStack = rightStack.addStack()
-    // audiStack.setPadding(20, 0, 10, 0)
-
-    // const _audiImage = audiStack.addImage(await this.getMyCarPhoto())
-    // _audiImage.imageSize = new Size(rightStack.size.width, 60)
-    // _audiImage.applyFillingContentMode()
-
-    // const rightBottomStack = rightStack.addStack()
-    // rightBottomStack.size = new Size(rightStack.size.width, 15)
-    // // 车辆状态
-    // const doorAndWindowStatus = data.doorAndWindow ? '车门车窗已关闭' : '请检查车门车窗是否已关闭'
-    // const _audiStatus = rightBottomStack.addText(doorAndWindowStatus)
-    // _audiStatus.font = Font.systemFont(12)
-    // _audiStatus.textColor = data.doorAndWindow ? this.dynamicFontColor() : new Color('#FF9900', 1)
-    // // endregion
-
-    return widget;
-  }
-
-  /**
-   * 渲染空数据组件
-   * @returns {Promise<ListWidget>}
-   */
-  async renderEmpty() {
-    const widget = new ListWidget();
-
-    widget.backgroundImage = await this.shadowImage(await this.getImageByUrl(DEFAULT_MY_CAR_PHOTO));
-    // widget.backgroundImage = await this.shadowImage(Image.fromFile(this.settings['myCarPhoto']))
-
-    const text = widget.addText('欢迎使用 Audi-Joiner iOS 桌面组件');
-    switch (this.widgetFamily) {
-      case 'large':
-        text.font = Font.blackSystemFont(18);
-        break;
-      case 'medium':
-        text.font = Font.blackSystemFont(18);
-        break;
-      case 'small':
-        text.font = Font.blackSystemFont(12);
-        break;
-    }
-    text.centerAlignText();
-    text.textColor = Color.white();
-
     return widget;
   }
 
@@ -771,6 +605,7 @@ class Widget extends Base {
     try {
       const getUserMineData = JSON.parse(Keychain.get('userMineData'));
       const getVehicleData = getUserMineData.vehicleDto;
+
       // 车辆名称
       GLOBAL_USER_DATA.seriesName = this.settings['myCarName'] ? this.settings['myCarName'] : getVehicleData?.seriesName;
       // 车辆功率类型
@@ -781,26 +616,6 @@ class Widget extends Base {
     } catch (error) {
       return '获取用户信息失败，' + error;
     }
-
-    // 是否开启位置
-    // if (this.showLocation()) {
-    //   try {
-    //     const getVehiclesPosition = JSON.parse(await this.handleVehiclesPosition())
-    //     const getVehiclesAddress = await this.handleGetCarAddress()
-    //     if (getVehiclesPosition.longitude) GLOBAL_USER_DATA.longitude = getVehiclesPosition.longitude // 车辆经度
-    //     if (getVehiclesPosition.latitude) GLOBAL_USER_DATA.latitude = getVehiclesPosition.latitude // 车辆纬度
-    //     if (getVehiclesAddress) GLOBAL_USER_DATA.carLocation = getVehiclesAddress // 详细地理位置
-
-    //     //     console.log('经度'+getVehiclesPosition.longitude)
-    //     //     console.log('纬度'+getVehiclesPosition.latitude)
-    //     //     console.log('位置'+getVehiclesAddress)
-
-    //   } catch (error) {
-    //     GLOBAL_USER_DATA.longitude = -1 // 车辆经度
-    //     GLOBAL_USER_DATA.latitude = -1 // 车辆纬度
-    //     GLOBAL_USER_DATA.carLocation = '暂无位置信息' // 详细地理位置
-    //   }
-    // }
 
     try {
       const getVehiclesStatus = await this.handleVehiclesStatus();
@@ -831,11 +646,9 @@ class Widget extends Base {
       GLOBAL_USER_DATA.isLocked = isLocked;// 车辆状态 true = 已锁车
       GLOBAL_USER_DATA.doorStatus = doorStatusArr;
       GLOBAL_USER_DATA.windowStatus = windowStatusArr;
-      // GLOBAL_USER_DATA.doorAndWindow = equipmentStatusArr.length === 0;// true 车窗已关闭 | false 请检查车窗是否关闭
     } catch (error) {
       return '获取车辆状态失败，请确保是否已经激活车联网服务，' + error;
     }
-
     return GLOBAL_USER_DATA;
   }
 
@@ -1294,16 +1107,16 @@ class Widget extends Base {
     };
     const response = await this.http(options);
     if (response.status === '1') {
-      // const address = response.regeocode.formatted_address
-      const addressComponent = response.regeocode.addressComponent;
-      console.log(addressComponent);
-      const address = (addressComponent.city + '' || addressComponent.province) +
-        addressComponent.district +
-        (addressComponent.streetNumber.street || '') +
-        (addressComponent.streetNumber.number || '');
-        // addressComponent.township;
-      Keychain.set('carAddress', address);
-      return address;
+      console.log('handleGetCarAddress:' + JSON.stringify(response));
+      return response.regeocode.formatted_address;
+      // const addressComponent = response.regeocode.addressComponent;
+      // const address = (addressComponent.city + '' || addressComponent.province) +
+      //   addressComponent.district +
+      //   (addressComponent.streetNumber.street || '') +
+      //   (addressComponent.streetNumber.number || '');
+      //   // addressComponent.township;
+      // Keychain.set('carAddress', address);
+      // return address;
     } else {
       console.error('获取车辆位置失败，请检查高德地图 key 是否填写正常');
       if (Keychain.contains('carAddress')) {
@@ -1359,7 +1172,6 @@ class Widget extends Base {
   async actionLogAction() {
     const alert = new Alert();
     alert.title = '重载数据';
-    alert.message = '如果发现数据延迟，选择对应函数获取最新数据，同样也是获取日志分享给开发者使用。';
 
     const menuList = [{
       name: 'bootstrap',
@@ -1402,13 +1214,12 @@ class Widget extends Base {
       const latitude = getVehiclesPosition.latitude / 1000000; // 车辆纬度
       const cb = new CallbackURL(`baidumap://map/marker`);
       cb.addParameter('location', `${latitude},${longitude}`);
-      cb.addParameter('title', `🚘`);
+      cb.addParameter('title', getVehiclesAddress);
       cb.addParameter('content', `${latitude},${longitude}`);
       cb.addParameter('zoom', `18`);
       cb.addParameter('coord_type', `gcj02`);
       cb.addParameter('src', `ios.baidu.openAPIdemo`);
       cb.open();
-      this.notify('' + getVehiclesAddress);
     } catch (error) {
       await this.notify('执行失败', '当前车辆处于运行状态或车辆没有上传位置信息');
     }
