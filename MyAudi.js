@@ -470,10 +470,28 @@ class Widget extends Base {
   formatStatusLabel(data) {
     // 格式化时间
     const formatter = new DateFormatter();
-    formatter.dateFormat = "HH:mm";
+    formatter.dateFormat = "H:mm";
     const updateDate = new Date(data.updateDate);
     const updateDateString = formatter.string(updateDate);
-    return `${updateDateString}更新`;
+    const now = Date.now();
+    const diff = Math.round((now - updateDate) / 1000);
+    return {
+      text: `${updateDateString}更新`,
+      diff,
+    };
+    // const updateDate = new Date(data.updateDate).getTime();
+    // if (diff < 60) {
+    //   return '刚刚';
+    // }
+    // if (diff >= 86400) {
+    //   return Math.round(diff / 86400) + '天前';
+    // }
+    // const mins = diff / 60;
+    // const hours = Math.round(mins / 60);
+    // if (hours === 0) {
+    //   return Math.floor(mins) + '分钟前';
+    // }
+    // return Math.floor(hours) + '小时前';
   }
 
   /**
@@ -485,6 +503,7 @@ class Widget extends Base {
     let w = new ListWidget();
     w.backgroundGradient = this.getBackgroundColor();
     const fontColor = new Color('#2B2B2B', 1);
+    const dangerColor = new Color('f53f3f', 1);
     const paddingLeft = 0; //Math.round(width * 0.07);
     const topBox = w.addStack();
     const topBoxLeft = topBox.addStack();
@@ -518,22 +537,26 @@ class Widget extends Base {
     carStatusBox.cornerRadius = 4;
     carStatusBox.backgroundColor = new Color("#f2f2f2", 1);
     let statusText = '已锁车'
+    let statusTextColor = fontColor;
     if (data.doorStatus.length !== 0) {
-      statusText = data.doorStatus.join('、') + '';
+      statusText = data.doorStatus.map(i => i.name).join('、') + '已开';
+      statusTextColor = dangerColor;
     } else if (data.windowStatus.length !== 0) {
-      statusText = data.windowStatus.join('、') + '';
+      statusText = data.windowStatus.map(i => i.name).join('、') + '已开';
+      statusTextColor = dangerColor;
     } else if (!data.isLocked) {
       statusText = '未锁车';
+      statusTextColor = dangerColor;
     }
     let carStatusTxt = carStatusBox.addText(statusText);
     carStatusTxt.font = new Font(FONT_NORMAL, 10);
-    carStatusTxt.textColor = fontColor;
+    carStatusTxt.textColor = statusTextColor;
     carStatusTxt.textOpacity = 0.7;
     carStatusBox.addSpacer(5);
     let statusLabel = this.formatStatusLabel(data);
-    const updateTxt = carStatusBox.addText(statusLabel);
+    const updateTxt = carStatusBox.addText(statusLabel.text);
     updateTxt.font = new Font(FONT_NORMAL, 10);
-    updateTxt.textColor = new Color("#333333", 1);
+    updateTxt.textColor = statusLabel >= 86400 ? dangerColor : new Color("#333333", 1);
     updateTxt.textOpacity = 0.5;
     // ---中间部件完---
     w.addSpacer();
