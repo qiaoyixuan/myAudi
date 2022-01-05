@@ -419,8 +419,10 @@ class Widget extends Base {
       if (!Keychain.contains('authToken')) {
         this.registerAction('账户登录', this.actionAccountSettings);
       } else {
-        this.registerAction('刷新数据', this.actionLogAction);
+        this.registerAction('个性化配置', this.preferenceSettings);
         this.registerAction('当前位置', this.currentLocation);
+        this.registerAction('刷新数据', this.actionLogAction);
+        this.registerAction('退出登录', this.actionLogOut);
         this.registerAction('退出登录', this.actionLogOut);
       }
     }
@@ -446,6 +448,105 @@ class Widget extends Base {
     this.saveSettings();
     console.log('开始进行用户登录');
     await this.handleAudiLogin();
+  }
+
+  async preferenceSettings() {
+    const alert = new Alert()
+    alert.title = '个性化配置'
+    // alert.message = '根据您的喜好设置，更好展示组件数据'
+
+    const menuList = [{
+      name: 'myCarName',
+      text: '自定义车辆名称',
+      icon: '💡'
+      // }, {
+      //   name: 'myCarModelName',
+      //   text: '自定义车辆功率',
+      //   icon: '🛻'
+    }, {
+      name: 'myCarPhoto',
+      text: '自定义车辆照片',
+      icon: '🚙'
+    // }, {
+    //   name: 'backgroundImage',
+    //   text: '自定义组件背景',
+    //   icon: '🎨'
+      // }, {
+      //   name: 'myOne',
+      //   text: '一言一句',
+      //   icon: '📝'
+    // }, {
+    //   name: 'aMapKey',
+    //   text: '高德地图密钥',
+    //   icon: '🎯'
+      // }, {
+      //   name: 'showLocation',
+      //   text: '设置车辆位置',
+      //   icon: '✈️'
+      // }, {
+      //   name: 'showPlate',
+      //   text: '设置车牌显示',
+      //   icon: '🚘'
+    }]
+
+    menuList.forEach(item => {
+      alert.addAction(item.icon + ' ' + item.text);
+    });
+
+    alert.addCancelAction('取消设置');
+    const id = await alert.presentSheet();
+    if (id === -1) return;
+    await this.actionPreferenceSettings(menuList[id].name);
+  }
+
+  async actionPreferenceSettings(type) {
+    switch (type) {
+      case 'myCarName': {
+        const alert = new Alert();
+        alert.title = '车辆名称';
+        // alert.message = '如果您不喜欢系统返回的名称可以自己定义名称'
+        alert.addTextField('请输入自定义名称', this.settings['myCarName']);
+        alert.addAction('确定');
+        alert.addCancelAction('取消');
+
+        const id = await alert.presentAlert();
+        if (id !== -1) {
+          this.settings['myCarName'] = alert.textFieldValue(0);
+          this.saveSettings();
+        }
+        break;
+      }
+      case 'myCarPhoto': {
+        const alert = new Alert();
+        alert.title = '车辆图片';
+        // alert.message = '请在相册选择您最喜欢的车辆图片以便展示到小组件上，最好是全透明背景PNG图。'
+        alert.addAction('选择照片');
+        alert.addCancelAction('取消');
+
+        const id = await alert.presentAlert();
+        if (id !== -1) {
+          try {
+            const image = await Photos.fromLibrary();
+            await Files.writeImage(this.filePath('myCarPhoto'), image);
+            this.settings['myCarPhoto'] = this.filePath('myCarPhoto');
+            this.saveSettings();
+          } catch (error) {
+            // 取消图片会异常 暂时不用管
+          }
+        }
+        break;
+      }
+      case 'backgroundImage': {
+
+        break;
+      }
+      case 'aMapKey': {
+
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   /**
@@ -502,7 +603,7 @@ class Widget extends Base {
   async renderSmall(data) {
     let w = new ListWidget();
     w.backgroundGradient = this.getBackgroundColor();
-    const fontColor = new Color('#2B2B2B', 1);
+    const fontColor = new Color('#000000', 1);
     const dangerColor = new Color('f53f3f', 1);
     const paddingLeft = 0; //Math.round(width * 0.07);
     const topBox = w.addStack();
@@ -522,7 +623,7 @@ class Widget extends Base {
     carInfoContainer.centerAlignContent();
     const vehicleNameContainer = w.addStack();
     vehicleNameContainer.setPadding(0, paddingLeft, 0, 0);
-    let vehicleNameStr = `Audi ${data.seriesName}`;
+    let vehicleNameStr = data.seriesName;
     const vehicleNameText = vehicleNameContainer.addText(vehicleNameStr);
     vehicleNameText.leftAlignText();
     vehicleNameText.font = new Font(FONT_EXTENDED_NOMAL, 16);
@@ -535,7 +636,7 @@ class Widget extends Base {
     carStatusBox.layoutHorizontally();
     carStatusBox.centerAlignContent();
     carStatusBox.cornerRadius = 4;
-    carStatusBox.backgroundColor = new Color("#f2f2f2", 1);
+    carStatusBox.backgroundColor = new Color("#ffffff", 0.4);
     let statusText = '已锁车'
     let statusTextColor = fontColor;
     if (data.doorStatus.length !== 0) {
@@ -556,7 +657,7 @@ class Widget extends Base {
     let statusLabel = this.formatStatusLabel(data);
     const updateTxt = carStatusBox.addText(statusLabel.text);
     updateTxt.font = new Font(FONT_NORMAL, 10);
-    updateTxt.textColor = statusLabel >= 86400 ? dangerColor : new Color("#333333", 1);
+    updateTxt.textColor = statusLabel.diff >= 86400 ? dangerColor : new Color("#000000", 0.3);
     updateTxt.textOpacity = 0.5;
     // ---中间部件完---
     w.addSpacer();
@@ -615,7 +716,7 @@ class Widget extends Base {
    */
   getBackgroundColor() {
     const bgColor = new LinearGradient();
-    bgColor.colors = [new Color('#cecece', 1), new Color('#ffffff', 1)];
+    bgColor.colors = [new Color('#aaa9ad', 1), new Color('#ffffff', 1)];
     bgColor.locations = [0.0, 1.0];
     return bgColor;
   }
@@ -1112,7 +1213,7 @@ class Widget extends Base {
    */
   async handleGetCarAddress() {
     if (!Keychain.contains('storedPositionResponse') && !Keychain.contains('carPosition')) {
-      await console.error('获取车辆经纬度失败，请退出登录再登录重试！');
+      console.error('获取车辆经纬度失败，请退出登录再登录重试！');
       return '暂无位置信息';
     }
     const carPosition = JSON.parse(Keychain.get('carPosition'));
@@ -1130,23 +1231,24 @@ class Widget extends Base {
     };
     const response = await this.http(options);
     if (response.status === '1') {
-      console.log('handleGetCarAddress:' + JSON.stringify(response));
-      return response.regeocode.formatted_address;
+      console.log('CarAddress:' + JSON.stringify(response));
+      const address = response.regeocode.formatted_address;
       // const addressComponent = response.regeocode.addressComponent;
       // const address = (addressComponent.city + '' || addressComponent.province) +
       //   addressComponent.district +
       //   (addressComponent.streetNumber.street || '') +
       //   (addressComponent.streetNumber.number || '');
       //   // addressComponent.township;
-      // Keychain.set('carAddress', address);
-      // return address;
+      Keychain.set('carAddress', address);
+      return address;
     } else {
       console.error('获取车辆位置失败，请检查高德地图 key 是否填写正常');
-      if (Keychain.contains('carAddress')) {
-        return Keychain.get('carAddress');
-      } else {
-        return '暂无位置信息';
-      }
+      return null;
+      // if (Keychain.contains('carAddress')) {
+      //   return Keychain.get('carAddress');
+      // } else {
+      //   return '暂无位置信息';
+      // }
     }
   }
 
@@ -1212,11 +1314,11 @@ class Widget extends Base {
       name: 'handleVehiclesPosition',
       text: '车辆经纬度数据'
     }
-    // , {
-    //   name: 'getDeviceInfo',
-    //   text: '获取设备信息'
-    // }
-  ];
+      // , {
+      //   name: 'getDeviceInfo',
+      //   text: '获取设备信息'
+      // }
+    ];
 
     menuList.forEach(item => {
       alert.addAction(item.text);
@@ -1230,22 +1332,38 @@ class Widget extends Base {
   }
 
   async currentLocation() {
-    try {
-      const getVehiclesAddress = await this.handleGetCarAddress()
-      const getVehiclesPosition = JSON.parse(await this.handleVehiclesPosition());
-      const longitude = getVehiclesPosition.longitude / 1000000; // 车辆经度
-      const latitude = getVehiclesPosition.latitude / 1000000; // 车辆纬度
-      const cb = new CallbackURL(`baidumap://map/marker`);
-      cb.addParameter('location', `${latitude},${longitude}`);
-      cb.addParameter('title', getVehiclesAddress);
-      cb.addParameter('content', `${latitude},${longitude}`);
-      cb.addParameter('zoom', `18`);
-      cb.addParameter('coord_type', `gcj02`);
-      cb.addParameter('src', `ios.baidu.openAPIdemo`);
-      cb.open();
-    } catch (error) {
-      await this.notify('执行失败', '当前车辆处于运行状态或车辆没有上传位置信息');
-    }
+    const account = this.settings['username'];
+    const password = this.settings['password'];
+    // this.notify(account + '' + password);
+    console.log(this.getSettings());
+    console.log(Keychain.get('authToken'));
+    console.log(Keychain.get('userMineData'));
+    console.log(Keychain.get('userBaseInfoData'));
+    // try {
+    //   const vehiclesAddress = await this.handleGetCarAddress()
+    //   const vehiclesPosition = JSON.parse(await this.handleVehiclesPosition());
+    //   const longitude = vehiclesPosition.longitude / 1000000; // 车辆经度
+    //   const latitude = vehiclesPosition.latitude / 1000000; // 车辆纬度
+    //   const cb = new CallbackURL(`baidumap://map/marker`);
+    //   cb.addParameter('location', `${latitude},${longitude}`);
+    //   cb.addParameter('title', vehiclesAddress || `${latitude},${longitude}`);
+    //   cb.addParameter('content', `${latitude},${longitude}`);
+    //   cb.addParameter('zoom', `18`);
+    //   cb.addParameter('coord_type', `gcj02`);
+    //   cb.addParameter('src', `ios.baidu.openAPIdemo`);
+    //   cb.open();
+    // } catch (error) {
+    //   await this.notify('执行失败', '当前车辆处于运行状态或车辆没有上传位置信息');
+    // }
+  }
+
+  /**
+   * 文件路径
+   * @param fileName
+   * @returns {string}
+   */
+   filePath(fileName) {
+    return Files.joinPath(Files.documentsDirectory(), fileName);
   }
 
   // /**
@@ -1263,53 +1381,53 @@ class Widget extends Base {
   //   console.log(JSON.stringify(data));
   // }
 
-  /**
-   * 自定义注册点击事件，用 actionUrl 生成一个触发链接，点击后会执行下方对应的 action
-   * @param {string} url 打开的链接
-   */
-  async actionOpenUrl(url) {
-    await Safari.openInApp(url, false);
-  }
+  // /**
+  //  * 自定义注册点击事件，用 actionUrl 生成一个触发链接，点击后会执行下方对应的 action
+  //  * @param {string} url 打开的链接
+  //  */
+  // async actionOpenUrl(url) {
+  //   await Safari.openInApp(url, false);
+  // }
 
-  /**
-   * 分割字符串
-   * @param str
-   * @param num
-   * @returns {*[]}
-   */
-  splitStr2Arr(str, num) {
-    const strArr = [];
-    for (let i = 0, l = str.length; i < l / num; i++) {
-      const string = str.slice(num * i, num * (i + 1));
-      strArr.push(string);
-    }
+  // /**
+  //  * 分割字符串
+  //  * @param str
+  //  * @param num
+  //  * @returns {*[]}
+  //  */
+  // splitStr2Arr(str, num) {
+  //   const strArr = [];
+  //   for (let i = 0, l = str.length; i < l / num; i++) {
+  //     const string = str.slice(num * i, num * (i + 1));
+  //     strArr.push(string);
+  //   }
 
-    return strArr;
-  }
+  //   return strArr;
+  // }
 
-  /**
-   * 获取动态字体颜色
-   * @return {Color}
-   */
-  dynamicFontColor() {
-    const lightFontColor = this.settings['lightFontColor'] ? this.settings['lightFontColor'] : '#000000';
-    const darkFontColor = this.settings['darkFontColor'] ? this.settings['darkFontColor'] : '#ffffff';
-    return Color.dynamic(new Color(lightFontColor, 1), new Color(darkFontColor, 1));
-  }
+  // /**
+  //  * 获取动态字体颜色
+  //  * @return {Color}
+  //  */
+  // dynamicFontColor() {
+  //   const lightFontColor = this.settings['lightFontColor'] ? this.settings['lightFontColor'] : '#000000';
+  //   const darkFontColor = this.settings['darkFontColor'] ? this.settings['darkFontColor'] : '#ffffff';
+  //   return Color.dynamic(new Color(lightFontColor, 1), new Color(darkFontColor, 1));
+  // }
 
-  /**
-   * 是否开启位置显示
-   */
-  showLocation() {
-    return true;
-    //     this.settings['showLocation']
-  }
+  // /**
+  //  * 是否开启位置显示
+  //  */
+  // showLocation() {
+  //   return true;
+  //   //     this.settings['showLocation']
+  // }
 
-  /**
-   * 是否开启位置显示
-   */
-  showPlate() {
-    return this.settings['showPlate'];
-  }
+  // /**
+  //  * 是否开启位置显示
+  //  */
+  // showPlate() {
+  //   return this.settings['showPlate'];
+  // }
 }
 await Running(Widget);
